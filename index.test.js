@@ -97,6 +97,7 @@ test("change interval", async () => {
   await sleep(300);
   ip.changeInterval(400);
   await sleep(320);
+  ip.stop();
   expect(Math.abs(markers[0] - start - 200)).toBeLessThan(99);
   expect(Math.abs(markers[1] - start - 600)).toBeLessThan(99);
 });
