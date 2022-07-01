@@ -1,6 +1,6 @@
 {
   "name": "interval-plus",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Truly pauseable, time-extendable, functionally dynamic intervals and timeouts to JavaScript in a lightweight package.",
   "main": "index.js",
   "scripts": {
