@@ -22,6 +22,7 @@ jobs:
     - run: npm install
     - run: npm test
   deploy:
+    needs: test
     runs-on: ubunto-latest
     steps:
     - uses: actions/checkout@v3
