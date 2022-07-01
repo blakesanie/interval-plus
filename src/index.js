@@ -47,31 +47,25 @@ class Pauseable {
     }
   }
 
+  waitForIterationClearance() {
+    return new Promise((res) => {
+      this.clearanceInterval = setInterval(() => {
+        if (!this.currentlyInIteration) res();
+      }, 10);
+    });
+  }
+
   async pause() {
-    if (!this.paused) {
-      if (this.currentlyInIteration) {
-        await new Promise((res) => {
-          setInterval(() => {
-            if (!this.currentlyInIteration) res();
-          }, 10);
-        });
-      }
-      clearInterval(this.loop);
-      this.activeTimeSinceInterval += new Date() - this.prevActiveStart;
-      this.prevActiveStart = undefined;
-      this.resumeRequest = undefined;
-      const now = new Date();
-      this.resumeWaitTime = this.nextIteration - now;
-      this.paused = true;
-      if (this.verbose)
-        console.log(this.name, "- pause,", this.resumeWaitTime, "ms remaining");
-    } else if (this.resumeRequest) {
+    if (this.paused && !this.resumeRequest) return;
+
+    if (this.currentlyInIteration) {
+      await this.waitForIterationClearance();
+    }
+    const now = new Date();
+    this.resumeWaitTime = this.nextIteration - now;
+    if (this.resumeRequest) {
       clearInterval(this.resumeRequest);
-      this.activeTimeSinceInterval += new Date() - this.prevActiveStart;
-      this.prevActiveStart = undefined;
       this.resumeRequest = undefined;
-      const now = new Date();
-      this.resumeWaitTime = this.nextIteration - now;
       if (this.verbose)
         console.log(
           this.name,
@@ -79,7 +73,16 @@ class Pauseable {
           this.resumeWaitTime,
           "ms remaining now"
         );
+    } else if (this.loop) {
+      clearInterval(this.loop);
+      this.loop = undefined;
+      if (this.verbose)
+        console.log(this.name, "- pause,", this.resumeWaitTime, "ms remaining");
     }
+
+    this.paused = true;
+    this.activeTimeSinceInterval += new Date() - this.prevActiveStart;
+    this.prevActiveStart = undefined;
   }
 
   resume() {
@@ -101,13 +104,11 @@ class Pauseable {
   }
 
   stop() {
+    clearInterval(this.clearanceInterval);
     clearInterval(this.resumeRequest);
     clearInterval(this.loop);
     this.resumeRequest = undefined;
     this.loop = undefined;
-    // this.paused = true;
-    // this.nextIteration = undefined;
-    // this.resumeWaitTime = undefined;
     if (this.verbose) console.log(this.name, "- stop loop");
   }
 

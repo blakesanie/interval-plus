@@ -200,21 +200,22 @@ test("skip to next iteration", async () => {
   ip.stop();
 });
 
-// test("pause during iteration", async () => {
-//   let ip = new IntervalPlus(
-//     async () => {
-//       await sleep(200);
-//     },
-//     200,
-//     {
-//       immediate: true,
-//     }
-//   );
-//   await sleep(50);
-//   ip.pause();
-//   await sleep(100);
-//   expect(ip.paused).toBeFalsy();
-//   await sleep(50);
-//   expect(ip.paused).toBeTruthy();
-//   ip.stop();
-// });
+test("pause during iteration", async () => {
+  let ip = new IntervalPlus(
+    async () => {
+      await sleep(200);
+    },
+    200,
+    {
+      immediate: true,
+    }
+  );
+  await sleep(50);
+  ip.pause();
+  await sleep(100);
+  expect(ip.paused).toBeFalsy();
+  await sleep(70);
+  expect(ip.paused).toBeTruthy();
+  // ip.resume();
+  ip.stop();
+});
