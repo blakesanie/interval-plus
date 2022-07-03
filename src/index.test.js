@@ -104,21 +104,39 @@ test("change interval", async () => {
 
 test("next interval", async () => {
   const start = new Date();
+
   let ip = new IntervalPlus(() => {}, 400);
   await sleep(200);
-  expect(Math.abs(ip.nextIterationActiveMs() - 200)).toBeLessThan(99);
-  expect(Math.abs(ip.nextIterationTime() - start - 400)).toBeLessThan(99);
+  expect(Math.abs(ip.nextInvocationActiveMs() - 200)).toBeLessThan(99);
+  expect(Math.abs(ip.nextInvocationTime() - start - 400)).toBeLessThan(99);
   ip.stop();
+  expect(ip.nextInvocationTime()).toBeUndefined();
+  expect(ip.nextInvocationActiveMs()).toBeUndefined();
+
   ip = new TimeoutPlus(() => {}, 100);
   await sleep(50);
   ip.pause();
-  expect(ip.nextIterationTime()).toEqual("paused");
-  expect(Math.abs(ip.nextIterationActiveMs() - 50)).toBeLessThan(49);
+  expect(ip.nextInvocationTime()).toEqual("paused");
+  expect(Math.abs(ip.nextInvocationActiveMs() - 50)).toBeLessThan(49);
   ip.resume();
   await sleep(200);
-  expect(ip.nextIterationTime()).toBeUndefined();
-  expect(ip.nextIterationActiveMs()).toBeUndefined();
+  expect(ip.nextInvocationTime()).toBeUndefined();
+  expect(ip.nextInvocationActiveMs()).toBeUndefined();
   ip.stop();
+
+  ip = new IntervalPlus(
+    async () => {
+      await sleep(100);
+    },
+    400,
+    {
+      immediate: true,
+    }
+  );
+  await sleep(10);
+  expect(ip.nextInvocationTime()).toBe("now");
+  expect(ip.nextInvocationActiveMs()).toBe("now");
+  await ip.stop();
 });
 
 test("prev interval", async () => {
@@ -131,10 +149,10 @@ test("prev interval", async () => {
     { immediate: true }
   );
   await sleep(200);
-  expect(Math.abs(ip.prevIterationStartActiveMs() - 200)).toBeLessThan(99);
-  expect(Math.abs(ip.prevIterationEndActiveMs() - 100)).toBeLessThan(99);
-  expect(Math.abs(ip.prevIterationStartTime() - start)).toBeLessThan(99);
-  expect(Math.abs(ip.prevIterationEndTime() - start - 100)).toBeLessThan(99);
+  expect(Math.abs(ip.prevInvocationStartActiveMs() - 200)).toBeLessThan(99);
+  expect(Math.abs(ip.prevInvocationEndActiveMs() - 100)).toBeLessThan(99);
+  expect(Math.abs(ip.prevInvocationStartTime() - start)).toBeLessThan(99);
+  expect(Math.abs(ip.prevInvocationEndTime() - start - 100)).toBeLessThan(99);
   ip.stop();
 });
 
@@ -153,46 +171,46 @@ test("prev interval with pauses", async () => {
   ip.resume();
   await sleep(100);
   ip.stop();
-  expect(Math.abs(ip.prevIterationStartActiveMs() - 300)).toBeLessThan(99);
-  expect(Math.abs(ip.prevIterationEndActiveMs() - 200)).toBeLessThan(99);
-  expect(Math.abs(ip.prevIterationStartTime() - start)).toBeLessThan(99);
-  expect(Math.abs(ip.prevIterationEndTime() - start - 100)).toBeLessThan(99);
+  expect(Math.abs(ip.prevInvocationStartActiveMs() - 300)).toBeLessThan(99);
+  expect(Math.abs(ip.prevInvocationEndActiveMs() - 200)).toBeLessThan(99);
+  expect(Math.abs(ip.prevInvocationStartTime() - start)).toBeLessThan(99);
+  expect(Math.abs(ip.prevInvocationEndTime() - start - 100)).toBeLessThan(99);
 });
 
-test("has future iterations", async () => {
+test("has future invocations", async () => {
   let ip = new IntervalPlus(() => {}, 10);
-  expect(ip.hasFutureIterations()).toBeTruthy();
+  expect(ip.hasFutureInvocations()).toBeTruthy();
   ip.pause();
-  expect(ip.hasFutureIterations()).toBeTruthy();
+  expect(ip.hasFutureInvocations()).toBeTruthy();
   ip.resume();
-  expect(ip.hasFutureIterations()).toBeTruthy();
+  expect(ip.hasFutureInvocations()).toBeTruthy();
   ip.stop();
-  expect(ip.hasFutureIterations()).toBeFalsy();
+  expect(ip.hasFutureInvocations()).toBeFalsy();
 
   ip = new TimeoutPlus(() => {}, 10);
-  expect(ip.hasFutureIterations()).toBeTruthy();
+  expect(ip.hasFutureInvocations()).toBeTruthy();
   await sleep(50);
-  expect(ip.hasFutureIterations()).toBeFalsy();
+  expect(ip.hasFutureInvocations()).toBeFalsy();
   ip.stop();
 });
 
 test("fail on non-interval-timeout", () => {
-  expect(
-    () =>
-      new intervalPlus(() => {}, 10000, {
-        pauseableType: "other",
-      })
-  ).toThrow(Error);
+  const BaseClass = Object.getPrototypeOf(IntervalPlus);
+  expect(() => {
+    new BaseClass(() => {}, 10000, {
+      pauseableType: "other",
+    });
+  }).toThrow('pauseableType must be "interval" or "timeout"');
 });
 
-test("skip to next iteration", async () => {
+test("skip to next invocation", async () => {
   const start = new Date();
   const checkpoints = [];
   let ip = new IntervalPlus(() => {
     checkpoints.push(new Date());
   }, 200);
   await sleep(300);
-  ip.skipToNextIteration();
+  ip.skipToNextInvocation();
   await sleep(300);
   expect(Math.abs(checkpoints[0] - start - 200)).toBeLessThan(99);
   expect(Math.abs(checkpoints[1] - start - 300)).toBeLessThan(99);
@@ -200,7 +218,7 @@ test("skip to next iteration", async () => {
   ip.stop();
 });
 
-test("pause during iteration", async () => {
+test("pause during invocation", async () => {
   let ip = new IntervalPlus(
     async () => {
       await sleep(200);
@@ -220,7 +238,7 @@ test("pause during iteration", async () => {
   ip.stop();
 });
 
-test("stop during iteration", async () => {
+test("stop during invocation", async () => {
   const ip = new IntervalPlus(async () => {
     await sleep(200);
   }, 200);
@@ -253,6 +271,40 @@ test("idempotent pause and resume and stop", async () => {
   expect(Math.abs(end - start - 1200)).toBeLessThan(99);
 });
 
+test("no prev invocation", async () => {
+  let ip = new IntervalPlus(
+    async () => {
+      await sleep(200);
+    },
+    200,
+    {
+      immediate: true,
+    }
+  );
+  await sleep(10);
+  expect(ip.prevInvocationStartTime()).toBeTruthy();
+  expect(ip.prevInvocationStartActiveMs()).toBeTruthy();
+  expect(ip.prevInvocationEndTime()).toBeFalsy();
+  expect(ip.prevInvocationEndActiveMs()).toBeFalsy();
+  await sleep(230);
+  expect(ip.prevInvocationEndTime()).toBeTruthy();
+  expect(ip.prevInvocationEndActiveMs()).toBeTruthy();
+  await ip.stop();
+
+  ip = new IntervalPlus(async () => {
+    await sleep(200);
+  }, 100);
+  await sleep(150);
+  expect(ip.prevInvocationStartTime()).toBeTruthy();
+  expect(ip.prevInvocationStartActiveMs()).toBeTruthy();
+  expect(ip.prevInvocationEndTime()).toBeFalsy();
+  expect(ip.prevInvocationEndActiveMs()).toBeFalsy();
+  await sleep(200);
+  expect(ip.prevInvocationEndTime()).toBeTruthy();
+  expect(ip.prevInvocationEndActiveMs()).toBeTruthy();
+  await ip.stop();
+});
+
 // test("no prev invocation", async () => {
 //   const ip = new IntervalPlus(
 //     async () => {
@@ -264,12 +316,12 @@ test("idempotent pause and resume and stop", async () => {
 //     }
 //   );
 //   await sleep(50);
-//   // expect(ip.prevIterationStartTime()).toBeTruthy();
-//   // expect(ip.prevIterationStartActiveMs).toBeTruthy();
-//   // expect(ip.prevIterationEndTime()).toBeFalsy();
-//   // expect(ip.prevIterationEndActiveMs).toBeFalsy();
+//   // expect(ip.prevInvocationStartTime()).toBeTruthy();
+//   // expect(ip.prevInvocationStartActiveMs).toBeTruthy();
+//   // expect(ip.prevInvocationEndTime()).toBeFalsy();
+//   // expect(ip.prevInvocationEndActiveMs).toBeFalsy();
 //   // await sleep(200);
-//   // expect(ip.prevIterationEndTime()).toBeTruthy();
-//   // expect(ip.prevIterationEndActiveMs).toBeTruthy();
+//   // expect(ip.prevInvocationEndTime()).toBeTruthy();
+//   // expect(ip.prevInvocationEndActiveMs).toBeTruthy();
 //   ip.stop();
 // });

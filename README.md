@@ -92,7 +92,7 @@ const immediateInterval = new IntervalPlus(() => {
 
 ## Operations
 
-#### pause()
+### pause()
 
 ```js
 await interval.pause()
@@ -104,7 +104,7 @@ This operation is idempotent - calling it multiple times sequentially is a the s
 
 If called during invocation, this operation will apply as soon as invocation terminates.
 
-#### resume()
+### resume()
 
 ```js
 interval.resume()
@@ -114,7 +114,7 @@ Wake the interval from its sleep, counting down the remaining active time until 
 
 This operation is idempotent - calling it multiple times sequentially is a the same as a single call.
 
-#### stop()
+### stop()
 
 ```js
 await interval.stop()
@@ -128,13 +128,13 @@ This operation is idempotent - calling it multiple times sequentially is a the s
 
 If called during invocation, this operation will apply as soon as invocation terminates.
 
-#### changeInterval(ms)
+### changeInterval(ms)
 
 ```js
 await changeInterval(2500)
 ```
 
-##### Function Parameters
+#### Function Parameters
 
 1. ms: _number_, **required**
 
@@ -142,48 +142,82 @@ Adjust the interval's millisecond wait between invocations to equal ms.
 
 If called during invocation, this operation will apply as soon as invocation terminates.
 
-#### nextIterationTime()
+### nextInvocationTime()
+
+```js
+const nextDateObj = interval.nextInvocationTime()
+```
 
 Obtain a Date object corresponding to the next invocation, assuming no pausing.
 
 Returns `"now"` if currently executing.
 Returns `"paused"` if paused.
 
-#### nextIterationActiveMs()
+### nextInvocationActiveMs()
+
+```js
+const nextMs = interval.nextInvocationActiveMs()
+```
 
 Get the number of active milliseconds until next invocation. Active means time passing while in a non-paused state.
 
 Returns `"now"` if currently executing.
 Returns `"paused"` if paused.
 
-#### prevIterationStartTime()
+### prevInvocationStartTime()
+
+```js
+const prevStart = interval.prevInvocationStartTime()
+```
 
 Obtain a Date object corresponding to the start of the previous invocation.
 
 Returns `undefined` if no previous invocation.
 
-#### prevIterationEndTime()
+### prevInvocationEndTime()
+
+```js
+const prevEnd = interval.prevInvocationEndTime()
+```
 
 Obtain a Date object corresponding to the end of the previous invocation.
 
 Returns `undefined` if no previous invocation end.
 
-#### prevIterationStartActiveMs()
+### prevInvocationStartActiveMs()
+
+```js
+const prevStartMs = interval.prevInvocationStartActiveMs()
+```
 
 Get the number of active milliseconds since the previous invocation start. Active means time passed while in a non-paused state.
 
 Returns `undefined` if no previous invocation.
 
-#### prevIterationEndActiveMs()
+### prevInvocationEndActiveMs()
+
+```js
+const prevEndMs = interval.prevInvocationeEndActiveMs()
+```
 
 Get the number of active milliseconds since the previous invocation end. Active means time passed while in a non-paused state.
 
 Returns `undefined` if no previous invocation end.
 
-#### skipToNextIteration()
+### skipToNextInvocation()
+
+```js
+await interval.skipToNextInvocation()
+```
 
 Immediately skip forward to the next invocation, respecting a constant time interval afterwards.
 
-#### hasFutureIterations()
+If called during invocation, this operation will apply as soon as invocation terminates.
+
+### hasFutureInvocations()
+
+```js
+const isAlive = interval.hasFutureInvocations()
+```
 
 Returns a boolean describing whether or not future invocations will be made. For instance, this function returns `false` once `stop()` has been called.

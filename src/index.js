@@ -8,73 +8,70 @@ class Pauseable {
     this.name = options.name || "IntervalPlus";
     this.immediate = options.immediate || false;
     this.pauseableType = options.pauseableType;
-    this.currentlyInIteration = false;
+    this.currentlyInInvocation = false;
+    this.fresh = true;
+    if (!["timeout", "interval"].includes(this.pauseableType))
+      throw Error('pauseableType must be "interval" or "timeout"');
     this.startInterval(this.immediate);
   }
 
-  setNextIteration() {
+  setNextInvocation() {
     const now = new Date();
     now.setMilliseconds(now.getMilliseconds() + this.interval);
     this.activeTimeSinceInterval = 0;
-    this.nextIteration = now;
+    this.nextInvocation = now;
   }
 
   async startInterval(immediate = false) {
+    this.stopped = false;
     if (this.verbose) console.log(this.name, "- start loop");
     const loopFunc = async () => {
-      this.currentlyInIteration = true;
-      this.nextIteration = "now";
-      if (this.verbose) console.log(this.name, "- loop iteration");
+      this.currentlyInInvocation = true;
+      this.nextInvocation = "now";
+      if (this.verbose) console.log(this.name, "- loop invocation");
       this.resumeWaitTime = undefined;
-      this.prevIterationStart = new Date();
+      this.prevInvocationStart = new Date();
       this.prevActiveStart = new Date();
       if (this.func[Symbol.toStringTag] === "AsyncFunction") {
-        console.log("start func");
         await this.func();
-        console.log("end func");
       } else {
         this.func();
       }
-      this.prevIterationEnd = new Date();
-      this.setNextIteration();
-      this.currentlyInIteration = false;
+      this.prevInvocationEnd = new Date();
+      this.setNextInvocation();
+      this.currentlyInInvocation = false;
     };
     if (immediate) await loopFunc();
-    this.setNextIteration();
+    if (this.stopped) return;
+    this.setNextInvocation();
     if (this.pauseableType == "interval") {
       this.loop = setInterval(loopFunc, this.interval);
-    } else if (this.pauseableType == "timeout") {
-      this.loop = setTimeout(loopFunc, this.interval);
     } else {
-      throw Error('pauseableType must be "interval" or "timeout"');
+      this.loop = setTimeout(loopFunc, this.interval);
     }
+    this.fresh = false;
   }
 
-  async waitForIterationClearance() {
+  async waitForInvocationClearance() {
     if (this.verbose) console.log(this.name, "- waiting for invocation end");
     return new Promise((res) => {
-      console.log("waiting");
       this.clearanceInterval = setInterval(() => {
-        if (!this.currentlyInIteration) {
-          console.log("resolving promise");
+        if (!this.currentlyInInvocation) {
           clearInterval(this.clearanceInterval);
           res();
-        } else {
-          // console.log("still waiting", new Date());
         }
       }, 10);
-      console.log("after setInterval");
     });
   }
 
   async pause() {
     if (this.paused && !this.resumeRequest) return;
 
-    if (this.currentlyInIteration) {
-      await this.waitForIterationClearance();
+    if (this.currentlyInInvocation) {
+      await this.waitForInvocationClearance();
     }
     const now = new Date();
-    this.resumeWaitTime = this.nextIteration - now;
+    this.resumeWaitTime = this.nextInvocation - now;
     if (this.resumeRequest) {
       clearInterval(this.resumeRequest);
       this.resumeRequest = undefined;
@@ -104,7 +101,7 @@ class Pauseable {
       this.prevActiveStart = new Date();
       const now = new Date();
       now.setMilliseconds(now.getMilliseconds() + this.resumeWaitTime);
-      this.nextIteration = now;
+      this.nextInvocation = now;
       this.resumeRequest = setTimeout(() => {
         if (this.verbose) console.log(this.name, "- resuming now");
         this.resumeRequest = undefined;
@@ -116,17 +113,15 @@ class Pauseable {
   }
 
   async stop() {
+    this.stopped = true;
     clearInterval(this.clearanceInterval);
     clearInterval(this.resumeRequest);
     clearInterval(this.loop);
-    console.log("cleared intervals");
     this.resumeRequest = undefined;
     this.loop = undefined;
     if (this.verbose) console.log(this.name, "- stop loop");
-    if (this.currentlyInIteration) {
-      console.log("start wait");
-      await this.waitForIterationClearance();
-      console.log("end wait");
+    if (this.currentlyInInvocation) {
+      await this.waitForInvocationClearance();
     }
   }
 
@@ -141,36 +136,41 @@ class Pauseable {
         this.name,
         "- been",
         timeElapsed,
-        "unpaused ms since last iteration"
+        "unpaused ms since last invocation"
       );
     this.resumeWaitTime = Math.max(0, interval - timeElapsed);
     this.interval = interval;
     this.resume();
   }
 
-  nextIterationTime() {
-    if (!this.hasFutureIterations()) return;
+  nextInvocationTime() {
+    if (!this.hasFutureInvocations()) return;
+    if (this.nextInvocation == "now") return this.nextInvocation;
     if (this.paused) return "paused";
-    return this.nextIteration;
+    return new Date(this.nextInvocation.getTime());
   }
 
-  nextIterationActiveMs() {
-    if (!this.hasFutureIterations()) return;
+  nextInvocationActiveMs() {
+    const time = this.nextInvocationTime();
+    if (!time) return;
+    if (time == "now") return time;
     if (this.paused) return this.resumeWaitTime;
     if (this.loop && !this.loop._destroyed)
-      return this.resumeWaitTime || this.nextIteration - new Date();
-    return;
+      return this.resumeWaitTime || this.nextInvocation - new Date();
   }
 
-  prevIterationStartTime() {
-    return this.prevIterationStart;
+  prevInvocationStartTime() {
+    if (!this.prevInvocationStart) return;
+    return new Date(this.prevInvocationStart.getTime());
   }
 
-  prevIterationEndTime() {
-    return this.prevIterationEnd;
+  prevInvocationEndTime() {
+    if (!this.prevInvocationEnd) return;
+    return new Date(this.prevInvocationEnd.getTime());
   }
 
-  prevIterationStartActiveMs() {
+  prevInvocationStartActiveMs() {
+    if (!this.prevInvocationStartTime()) return;
     let out = this.activeTimeSinceInterval;
     if (this.prevActiveStart) {
       out += new Date() - this.prevActiveStart;
@@ -178,24 +178,26 @@ class Pauseable {
     return out;
   }
 
-  prevIterationEndActiveMs() {
+  prevInvocationEndActiveMs() {
+    if (!this.prevInvocationEndTime()) return;
     return (
-      this.prevIterationStartActiveMs() -
-      (this.prevIterationEndTime().getMilliseconds() -
-        this.prevIterationStartTime().getMilliseconds())
+      this.prevInvocationStartActiveMs() -
+      (this.prevInvocationEndTime().getMilliseconds() -
+        this.prevInvocationStartTime().getMilliseconds())
     );
   }
 
-  skipToNextIteration() {
+  skipToNextInvocation() {
     this.stop();
     this.startInterval(true);
   }
 
-  hasFutureIterations() {
+  hasFutureInvocations() {
     return (
+      this.fresh ||
       (this.paused && this.resumeWaitTime > 0) ||
       (this.loop && !this.loop._destroyed) ||
-      (this.resumeRequest && this.nextIteration > new Date())
+      (this.resumeRequest && this.nextInvocation > new Date())
     );
   }
 }
