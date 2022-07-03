@@ -15,7 +15,7 @@ Truly pauseable, time-extendable, functionally dynamic intervals and timeouts in
       * [Browser](#browser)
   * [Usage](#usage)
     * [Instantiation](#instantiation)
-      * [Constructor Parameters:](#constructor-parameters)
+      * [Constructor Parameters](#constructor-parameters)
     * [Instantiation Examples](#instantiation-examples)
   * [Operations](#operations)
     * [pause()](#pause)
@@ -80,7 +80,7 @@ const interval = new IntervalPlus(func, ms, options)
 const timeout = new TimeoutPlus(func, ms, options)
 ```
 
-#### Constructor Parameters:
+#### Constructor Parameters
 
 1. func: _function_, **required**
     *  a function to be invoked. Pass an `async` function to ensure asynchronous execution
@@ -163,7 +163,7 @@ If called during invocation, this operation will apply as soon as invocation ter
 ### changeInterval(ms)
 
 ```js
-await changeInterval(2500)
+await interval.changeInterval(2500)
 ```
 
 #### Function Parameters
