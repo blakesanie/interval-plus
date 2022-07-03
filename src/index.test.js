@@ -219,3 +219,57 @@ test("pause during iteration", async () => {
   // ip.resume();
   ip.stop();
 });
+
+test("stop during iteration", async () => {
+  const ip = new IntervalPlus(async () => {
+    await sleep(200);
+  }, 200);
+  await sleep(250);
+  const before = new Date();
+  expect(ip.loop).toBeTruthy();
+  await ip.stop();
+  expect(ip.loop).toBeFalsy();
+  expect(new Date() - before).toBeGreaterThan(100);
+});
+
+test("idempotent pause and resume and stop", async () => {
+  const start = new Date();
+  let end;
+  let ip = new TimeoutPlus(() => {
+    end = new Date();
+  }, 1000);
+  await sleep(200);
+  ip.pause();
+  ip.pause();
+  ip.pause();
+  await sleep(200);
+  ip.resume();
+  ip.resume();
+  ip.resume();
+  await sleep(1000);
+  ip.stop();
+  ip.stop();
+  ip.stop();
+  expect(Math.abs(end - start - 1200)).toBeLessThan(99);
+});
+
+// test("no prev invocation", async () => {
+//   const ip = new IntervalPlus(
+//     async () => {
+//       await sleep(200);
+//     },
+//     200,
+//     {
+//       immediate: true,
+//     }
+//   );
+//   await sleep(50);
+//   // expect(ip.prevIterationStartTime()).toBeTruthy();
+//   // expect(ip.prevIterationStartActiveMs).toBeTruthy();
+//   // expect(ip.prevIterationEndTime()).toBeFalsy();
+//   // expect(ip.prevIterationEndActiveMs).toBeFalsy();
+//   // await sleep(200);
+//   // expect(ip.prevIterationEndTime()).toBeTruthy();
+//   // expect(ip.prevIterationEndActiveMs).toBeTruthy();
+//   ip.stop();
+// });

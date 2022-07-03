@@ -5,11 +5,11 @@ class Pauseable {
     this.activeTimeSinceInterval = 0;
     this.paused = false;
     this.verbose = options.verbose || false;
-    this.name = options.name || "PauseableInterval";
+    this.name = options.name || "IntervalPlus";
     this.immediate = options.immediate || false;
     this.pauseableType = options.pauseableType;
     this.currentlyInIteration = false;
-    this.startInterval();
+    this.startInterval(this.immediate);
   }
 
   setNextIteration() {
@@ -23,12 +23,15 @@ class Pauseable {
     if (this.verbose) console.log(this.name, "- start loop");
     const loopFunc = async () => {
       this.currentlyInIteration = true;
+      this.nextIteration = "now";
       if (this.verbose) console.log(this.name, "- loop iteration");
       this.resumeWaitTime = undefined;
       this.prevIterationStart = new Date();
       this.prevActiveStart = new Date();
       if (this.func[Symbol.toStringTag] === "AsyncFunction") {
+        console.log("start func");
         await this.func();
+        console.log("end func");
       } else {
         this.func();
       }
@@ -36,7 +39,7 @@ class Pauseable {
       this.setNextIteration();
       this.currentlyInIteration = false;
     };
-    if (immediate || this.immediate) await loopFunc();
+    if (immediate) await loopFunc();
     this.setNextIteration();
     if (this.pauseableType == "interval") {
       this.loop = setInterval(loopFunc, this.interval);
@@ -47,11 +50,20 @@ class Pauseable {
     }
   }
 
-  waitForIterationClearance() {
+  async waitForIterationClearance() {
+    if (this.verbose) console.log(this.name, "- waiting for invocation end");
     return new Promise((res) => {
+      console.log("waiting");
       this.clearanceInterval = setInterval(() => {
-        if (!this.currentlyInIteration) res();
+        if (!this.currentlyInIteration) {
+          console.log("resolving promise");
+          clearInterval(this.clearanceInterval);
+          res();
+        } else {
+          // console.log("still waiting", new Date());
+        }
       }, 10);
+      console.log("after setInterval");
     });
   }
 
@@ -103,16 +115,23 @@ class Pauseable {
     }
   }
 
-  stop() {
+  async stop() {
     clearInterval(this.clearanceInterval);
     clearInterval(this.resumeRequest);
     clearInterval(this.loop);
+    console.log("cleared intervals");
     this.resumeRequest = undefined;
     this.loop = undefined;
     if (this.verbose) console.log(this.name, "- stop loop");
+    if (this.currentlyInIteration) {
+      console.log("start wait");
+      await this.waitForIterationClearance();
+      console.log("end wait");
+    }
   }
 
-  changeInterval(interval) {
+  async changeInterval(interval) {
+    // needs to wait until end of current execution
     if (this.verbose) console.log(this.name, "- change interval");
     this.pause();
     this.stop();
